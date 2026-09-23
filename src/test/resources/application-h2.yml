@@ -1,0 +1,29 @@
+spring:
+  datasource:
+    # H2 MySQL 兼容模式：仅用于无 Docker 环境的端到端验证，生产仍是 MySQL
+    url: jdbc:h2:mem:pigeon;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema-h2.sql
+  # 测试不连 Redis（本功能不依赖缓存；屏蔽自动装配的连接尝试）
+  data:
+    redis:
+      host: localhost
+      port: 6390
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: input
+
+pagehelper:
+  helper-dialect: h2
+  reasonable: false
+  support-methods-arguments: true
+  params: count=countSql

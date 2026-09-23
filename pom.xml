@@ -102,6 +102,13 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- 本地/CI 端到端验证用：无 Docker、无 root 的环境下以 H2 的 MySQL 兼容模式
+             跑建表 SQL 与联表查询。生产仍用 MySQL（mysql-connector-j，runtime 作用域）。 -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

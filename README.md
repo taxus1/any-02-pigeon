@@ -160,3 +160,29 @@ docker-compose.yml  一键起 mysql+redis
 | 三层分离后 VO 字段白名单：接口只返回 `id / name / score / createTime` | ✅ 通过，`delFlag`/`createBy`/`updateBy`/`updateTime` 不再外泄 |
 | 领域层依赖方向：`domain` 下无 `baomidou` / `springframework` 依赖 | ✅ 通过，只剩 Reactor 与业务异常 |
 
+## 赛鸽训放后半条线（`pigeon` 上下文）
+
+训放「归巢报到 → 算分速排名 → 名次榜」三件事，表结构见 `doc/schema/pigeon.sql`（模型不碰建表）。
+
+### 接口
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/pigeon/clocking` | 归巢报到。JSON：`raceId / bandCode / clockAt(yyyy-MM-dd HH:mm:ss) / source(SCAN\|MANUAL)` |
+| POST | `/api/pigeon/races/{raceId}/score` | 出成绩：算分速、排名次；重算整事务覆盖，库里始终只有最新一套 |
+| GET | `/api/pigeon/races/{raceId}/rank?pageNum=1&pageSize=20` | 名次榜分页：足环号、鸽主、归巢时刻、分速、名次 |
+
+### 业务规则落点
+
+- 报到校验（任一不过返回 `code=1` + 中文原因，绝不闷头入库）：赛项存在 → 足环存在且 `ACTIVE`
+  → 本场赛集过鸽（`t_entry`）→ 该集鸽无报到记录（`t_clocking.uk_entry` + 库侧并发兜底）
+  → 归巢时刻晚于 `release_at`、不晚于 `close_at`（空=不限，踩点关门有效）→ 来源仅 `SCAN/MANUAL`。
+- 分速：`distance_km × 1000 ÷ 飞行分钟`（按毫秒精确换算分钟，不取整），`HALF_UP` 保留 2 位写 `t_result.speed_mpm`。
+- 名次：分速降序 1 起连号；同分速先到先得（归巢时刻早者靠前）。
+- 重算覆盖：`RaceResultRepositoryImpl#replaceForRace` 用 `TransactionTemplate` 把
+  **物理删旧（手写 DELETE，不走 @TableLogic，避免 `uk_race_entry` 被软删行占住）+ 插新**
+  包成一个事务，失败整段回滚。
+- 名次榜是 `t_result` 联 `t_clocking/t_entry/t_band` 的单条 SQL（每张表显式 `del_flag=0`），
+  PageHelper 分页，榜上数据与成绩同源。
+
+
